@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Enterprise Billing Dashboard — CSV Driven (Benchmark + All Categories)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f6fb; --card:#ffffff; --accent:#1a73e8; --muted:#6b7280;
+  --success:#16a34a; --danger:#dc2626; --radius:12px;
+}
+*{box-sizing:border-box;font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,#f6f9ff,var(--bg));color:#0f172a;}
+.app{display:grid;grid-template-columns:240px 1fr;gap:24px;max-width:1200px;margin:28px auto;padding:20px;}
+.sidebar{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:0 8px 28px rgba(18,38,63,0.06);height:calc(100vh - 90px);position:sticky;top:20px;display:flex;flex-direction:column;gap:18px;}
+.brand{display:flex;gap:12px;align-items:center}
+.brand .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#1765c9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
+.brand h1{font-size:16px;margin:0}
+.nav{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.nav button{background:transparent;border:none;text-align:left;padding:10px;border-radius:8px;cursor:pointer;color:var(--muted);font-weight:600}
+.nav button.active{background:linear-gradient(90deg,rgba(26,115,232,0.08),rgba(26,115,232,0.04));color:var(--accent)}
+.sidebar .meta{margin-top:auto;font-size:13px;color:var(--muted)}
+.main{min-height:600px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.uploader{display:flex;gap:12px;align-items:center;background:var(--card);padding:12px 14px;border-radius:12px;box-shadow:0 6px 18px rgba(18,38,63,0.04)}
+.uploader input[type=file]{display:none}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;background:var(--accent);color:white;border:none;cursor:pointer;font-weight:600}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(26,115,232,0.12)}
+.small{font-size:13px;color:var(--muted)}
+.tabs{background:var(--card); padding:16px;border-radius:12px; box-shadow:0 6px 18px rgba(18,38,63,0.04);}
+.tab-controls{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.tab-controls button{background:transparent;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;color:var(--muted);font-weight:600}
+.tab-controls button.active{background:linear-gradient(90deg,rgba(26,115,232,0.08),rgba(26,115,232,0.04));color:var(--accent)}
+.tab-content{padding:8px 0}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 18px rgba(18,38,63,0.04)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 8px;text-align:left;border-bottom:1px solid #eef2f6}
+th{font-weight:700;color:var(--muted);font-size:12px}
+.status-pass{color:var(--success);font-weight:700}
+.status-fail{color:var(--danger);font-weight:700}
+.muted{color:var(--muted)}
+.formula{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono",monospace;font-size:13px;color:#0b1220}
+input[type="number"], input[type="text"]{padding:8px;border-radius:8px;border:1px solid #e6eefc;width:100%}
+label.small{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+.form-row{display:flex;gap:12px;align-items:center;margin-bottom:8px}
+.wizard-step{display:none}
+.wizard-step.active{display:block}
+.wizard-progress{display:flex;gap:8px;margin-bottom:20px;align-items:center}
+.wizard-progress .step{display:flex;align-items:center;gap:6px}
+.wizard-progress .step.completed .step-circle{background:var(--success);color:white}
+.step-circle{width:24px;height:24px;border-radius:50%;background:#e6eefc;border:2px solid #e6eefc;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px}
+.missing-params-grid{display:grid;gap:16px;margin-top:16px}
+.param-input-group{display:flex;flex-direction:column;gap:4px}
+.param-input-group input{background:var(--card);border:1px solid #e6eefc}
+.skip-btn{margin-top:16px}
+.tab-nav-disabled{opacity:0.5;pointer-events:none}
+.tab-content.hidden{display:none;}
+@media (max-width:980px){
+  .app{grid-template-columns:1fr;padding:12px}
+  .sidebar{position:relative;height:auto}
+  .grid{grid-template-columns:1fr}
+  .form-row{flex-direction:column;align-items:stretch}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" aria-label="Main navigation">
+    <div class="brand">
+      <div class="logo">EB</div>
+      <div>
+        <h1 style="font-size:15px;margin:0">Enterprise Billing</h1>
+        <div class="small">CSV → Automated Report</div>
+      </div>
+    </div>
+    <nav class="nav" role="navigation" aria-label="Sections">
+      <button class="nav-btn active" data-target="tab-dashboard">Dashboard</button>
+      <button class="nav-btn" data-target="tab-inputs">Input Parameters</button>
+      <button class="nav-btn" data-target="tab-compute">Computation Details</button>
+      <button class="nav-btn" data-target="tab-actual">Actual CCB Values</button>
+      <button class="nav-btn" data-target="tab-compare">Comparison</button>
+      <button class="nav-btn" data-target="tab-config">Configurable Data</button>
+    </nav>
+    <div class="meta">
+      <div class="small">Status</div>
+      <div class="meta-small">Waiting for CSV upload</div>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="uploader">
+        <label class="btn" for="fileInput" title="Upload CSV">Upload CSV</label>
+        <input id="fileInput" type="file" accept=".csv,.txt" />
+        <div class="small"><strong id="fileName">No file selected</strong></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="small">Category</div>
+        <select id="categorySelect" class="small" style="padding:8px;border-radius:8px;border:1px solid #e6eefc">
+          <option value="">Select</option>
+          <option value="DS">DS</option>
+          <option value="WDS">WDS</option>
+          <option value="NRS">NRS</option>
+          <option value="IND">IND</option>
+          <option value="Agriculture">Agriculture</option>
+          <option value="Public Light">Public Light</option>
+          <option value="Railway Traction">Railway Traction</option>
+        </select>
+        <div class="small">Subcategory</div>
+        <select id="subcategorySelect" class="small" style="padding:8px;border-radius:8px;border:1px solid #e6eefc">
+          <option value="">Select</option>
+        </select>
+        <div class="small">Slab</div>
+        <!-- third‑level dropdown for kW/kVA & kWh slab -->
+        <select id="slabSelect" class="small" style="padding:8px;border-radius:8px;border:1px solid #e6eefc">
+          <option value="">Select</option>
+        </select>
+      </div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  <button id="nextStepBtn" class="btn" style="display:none">Next Step →</button>
+  <button id="downloadBtn" class="btn ghost" onclick="downloadReportCSV()" style="display:none">Export CSV</button>
+</div>
+    </div>
+
+    <div id="wizardContainer">
+      <div class="wizard-progress">
+        <div class="step active"><div class="step-circle">1</div><span>Upload & Select</span></div>
+        <div class="step"><div class="step-circle">2</div><span>Missing Parameters</span></div>
+        <div class="step"><div class="step-circle">3</div><span>Results</span></div>
+      </div>
+
+      <div class="wizard-step active" id="step1">
+        <div class="tabs card">
+          <div class="tab-controls">
+            <button class="tab-btn active" data-target="tab-dashboard">Dashboard</button>
+          </div>
+          <div class="tab-content" id="tab-dashboard-content">
+            <div class="grid">
+              <div class="card">
+                <h3>Raw CSV Preview</h3>
+                <div class="small muted">Headers & first 10 rows</div>
+                <div style="overflow:auto;margin-top:10px;max-height:300px;">
+                  <table id="csvPreview"></table>
+                </div>
+              </div>
+              <div class="card">
+                <h3>Record Snapshot</h3>
+                <div class="small muted">Key values from selected row</div>
+                <div style="margin-top:10px;">
+                  <table>
+                    <tbody id="recordSummary">
+                      <tr><th>ACBILLMD</th><td id="sumACB">—</td></tr>
+                      <tr><th>BILLDAYS</th><td id="sumDays">—</td></tr>
+                      <tr><th>KWH (TOTALKWH)</th><td id="sumKWH">—</td></tr>
+                      <tr><th>KW (SL_KW)</th><td id="sumKW">—</td></tr>
+                      <tr><th>TOTAL_SUMMARY_ENERGY</th><td id="sumTotalSummary">—</td></tr>
+                      <tr><th>SOP (CSV)</th><td id="sumSOP">—</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-step" id="step2">
+        <div class="card">
+          <h3>Missing Parameters</h3>
+          <div class="small muted">Fill missing values from CSV (optional - can skip)</div>
+          <div id="missingParamsContainer" class="missing-params-grid"></div>
+          <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+            <button id="skipParamsBtn" class="btn ghost skip-btn">Skip & Continue</button>
+            <button id="fillParamsBtn" class="btn">Fill & Show Results</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-step" id="step3">
+        <div class="tabs card">
+          <div class="tab-controls tab-nav-disabled" role="tablist" id="resultTabControls">
+            <button class="tab-btn active" data-target="tab-inputs">Input Parameters</button>
+            <button class="tab-btn" data-target="tab-compute">Computation Details</button>
+            <button class="tab-btn" data-target="tab-actual">Actual CCB Values</button>
+            <button class="tab-btn" data-target="tab-compare">Comparison</button>
+            <button class="tab-btn" data-target="tab-config">Configurable Data</button>
+          </div>
+
+          <div class="tab-content" id="tab-inputs">
+            <div class="card">
+              <h3>Input Parameters</h3>
+              <div class="small muted">Final values used (CSV + Manual input)</div>
+              <div style="overflow:auto;">
+                <table id="inputsTable">
+                  <thead><tr><th>Parameter</th><th>Source</th><th>Value</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content hidden" id="tab-compute">
+            <div class="card">
+              <h3>Computation Details (Calculated)</h3>
+              <div class="small muted">Values calculated by formulas</div>
+              <div style="margin-top:10px;overflow:auto;">
+                <table id="calcTable">
+                  <thead><tr><th>Component</th><th>Value</th><th>Formula</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content hidden" id="tab-actual">
+            <div class="card">
+              <h3>Actual CCB Values (from CSV)</h3>
+              <div class="small muted">Values reported in the RC_SEQ CSV (empty → 0)</div>
+              <div style="margin-top:10px;overflow:auto;">
+                <table id="actualTable">
+                  <thead><tr><th>RC_SEQ</th><th>Description</th><th>CALC_AMT</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content hidden" id="tab-compare">
+            <div class="card">
+              <h3>Comparison (Calculated vs RC_SEQ CSV)</h3>
+              <div class="small muted">Green = Pass, Red = Fail (against RC_SEQ CALC_AMT)</div>
+              <div style="margin-top:12px; overflow:auto;">
+                <table id="compareTable">
+                  <thead>
+                    <tr><th>RC_SEQ</th><th>Component</th><th>Actual (CSV)</th><th>Calculated</th><th>Status</th></tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content hidden" id="tab-config">
+            <div class="card">
+              <h3>Configurable Data</h3>
+              <div class="small muted">Change base rates (saved in your browser)</div>
+              <div style="margin-top:10px;">
+                <div id="configForm">
+                  <div class="form-row">
+                    <div style="flex:1">
+                      <label class="small">Rate Slab 1 (₹/unit)</label>
+                      <input id="cfg_r1" type="number" step="0.01">
+                    </div>
+                    <div style="flex:1">
+                      <label class="small">Rate Slab 2 (₹/unit)</label>
+                      <input id="cfg_r2" type="number" step="0.01">
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div style="flex:1">
+                      <label class="small">Rate Slab 3 (₹/unit)</label>
+                      <input id="cfg_r3" type="number" step="0.01">
+                    </div>
+                    <div style="flex:1">
+                      <label class="small">Fixed Charge 1 (fr)</label>
+                      <input id="cfg_fr" type="number" step="0.01">
+                    </div>
+                  </div>
+                  <div style="margin-top:10px;">
+                    <button class="btn" id="saveConfig">Save Config</button>
+                    <button class="btn ghost" id="resetConfig">Reset</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Part 2/4 will start here: a single <script> block with all JS -->
+<script>
+/* ---------- HARD-CODED TARIFFS (FROM YOUR TABLE) ---------- */
+// Only a subset is shown here as example; extend similarly for all rows you need.
+const TARIFFS = {
+  DS: {
+    "Up to 2 kW – 0–100 kWh":      { fixedPerKW:50, energyRate:4.19 },
+    "Up to 2 kW – 101–300 kWh":    { fixedPerKW:50, energyRate:6.64 },
+    "Up to 2 kW – Above 300 kWh":  { fixedPerKW:50, energyRate:7.75 },
+
+    "Above 2 kW to 7 kW – 0–100 kWh":     { fixedPerKW:75, energyRate:4.44 },
+    "Above 2 kW to 7 kW – 101–300 kWh":   { fixedPerKW:75, energyRate:6.64 },
+    "Above 2 kW to 7 kW – Above 300 kWh": { fixedPerKW:75, energyRate:7.75 },
+
+    "Above 7 kW to 50 kW – 0–100 kWh":     { fixedPerKW:110, energyRate:5.34 },
+    "Above 7 kW to 50 kW – 101–300 kWh":   { fixedPerKW:110, energyRate:7.15 },
+    "Above 7 kW to 50 kW – Above 300 kWh": { fixedPerKW:110, energyRate:7.75 },
+
+    "Above 50 kW/kVA to 100 kVA – All Units": { fixedPerKW:130, energyRate:6.75 },
+    "Above 100 kVA – All Units":              { fixedPerKW:150, energyRate:6.96 },
+    "Sri Harmandir Sahib & Sri Durgiana Mandir – Above 2000 kW": { fixedPerKW:0, energyRate:6.41 }
+  },
+  NRS: {
+    "Up to 7 kW – 0–100 kWh":  { fixedPerKW:70,  energyRate:6.91 },
+    "Up to 7 kW – 101–500 kWh":{ fixedPerKW:70,  energyRate:7.17 },
+    "Up to 7 kW – Above 500 kWh":{ fixedPerKW:70,energyRate:7.75 },
+
+    "Above 7 kW to 20 kW – 0–100 kWh":  { fixedPerKW:110, energyRate:6.91 },
+    "Above 7 kW to 20 kW – 101–500 kWh":{ fixedPerKW:110, energyRate:7.17 },
+    "Above 7 kW to 20 kW – Above 500 kWh":{ fixedPerKW:110,energyRate:7.75 },
+
+    "Above 20 kW/kVA to 100 kVA – All Units": { fixedPerKW:130, energyRate:6.75 },
+    "Above 100 kVA – All Units":              { fixedPerKW:140, energyRate:6.96 },
+    "EV Charging Stations – All Units":       { fixedPerKW:0,   energyRate:6.28 }
+  },
+  IND: {
+    "Small Power – Up to 20 kVA – All Units": { fixedPerKW:105, energyRate:5.67 },
+    "Medium Supply – All Units":              { fixedPerKW:140, energyRate:6.10 },
+    "Large Supply – 100–2500 kVA – All Units":{ fixedPerKW:215, energyRate:6.45 },
+    "Large Supply – Above 2500 kVA – All Units":{ fixedPerKW:275,energyRate:6.55 },
+    "PIU – 100–2500 kVA – All Units":         { fixedPerKW:305, energyRate:6.80 },
+    "PIU – Above 2500 kVA – All Units":       { fixedPerKW:345, energyRate:6.89 }
+  },
+  Agriculture: {
+    "Agricultural Pump Sets – kWh":           { fixedPerKW:0,   energyRate:6.55 }
+  },
+  "Public Light": {
+    "Public Lighting – All Units":            { fixedPerKW:100, energyRate:7.79 }
+  },
+  "Railway Traction": {
+    "Railway Traction – All Units":           { fixedPerKW:340, energyRate:7.17 }
+  }
+};
+
+/* ---------- RC_SEQ FORMULAS CONFIG (LABEL + TYPE) ---------- */
+// Each entry defines how to compute that RC_SEQ later.
+const RC_SEQ_META = {
+  100: { label:"Fixed Charge Medium Supply General", type:"fixedMS" },
+  110: { label:"Fixed Charge from 2 to 7 KW", type:"fixedDS_2_7" },
+  180: { label:"Fixed Charge above 100 KVA", type:"fixedAbove100KVA" },
+  300: { label:"50% Fixed Charge Subsidy Medium supply", type:"subFixed50" },
+  550: { label:"Fixed Charge Subsidy Tariff Diff MS – GEN", type:"subFixedTariffDiff", fixedValue:-755.31 },
+  560: { label:"Fixed Charge Subsidy Tariff Diff MS – ICE-Off", type:"subFixedTariffDiff0", fixedValue:0 },
+  590: { label:"Summary Fixed charge Subsidy", type:"sum300_550_560" },
+  600: { label:"Summary Fixed Charges", type:"fixedGeneric" },
+
+  650: { label:"Meter rent Charges for 1-PH", type:"rentPerDay", perDay:11 },
+  690: { label:"Meter rent Charges for 3-PH LTCT without LTCT", type:"rentPerDay", perDay:19 },
+  700: { label:"LTCT rent Charges", type:"rentPerDay", perDay:5 },
+  710: { label:"HTCT 11 KV metering Equipment rent Charges", type:"rentPerDay", perDay:567 },
+  750: { label:"Meter rent Charges for HT Meter without LTCT", type:"rentPerDay", perDay:65 },
+  900: { label:"MCB rent Charges for 1-PH", type:"rentPerDay", perDay:9 },
+  950: { label:"MCB rent Charges for 3-PH LTCT", type:"rentPerDay", perDay:13 },
+  1000:{ label:"Summary Meter and MCB rent Charges", type:"sumRent" },
+
+  1100:{ label:"Energy Charges General MS", type:"EC_MS" },
+  1160:{ label:"Energy Charge 0–300 unit up to 2 to 7 KW", type:"EC_DS_0_300" },
+  1170:{ label:"Energy Charge >300 unit up to 2 to 7 KW", type:"EC_DS_above300" },
+  1250:{ label:"Energy Charges above 100 KVA", type:"EC_above100KVA" },
+
+  1650:{ label:"Subsidy Industrial EC MS", type:"subEC_MS", fixedValue:-322.77 },
+  1860:{ label:"Govt Subsidy above 300 unit up to 7 KW", type:"subDS_above300", fixedValue:-9250 },
+
+  2300:{ label:"Subsidy Off peak Hours – MS (16-10 to 31-03)", type:"fixedZero" },
+  2315:{ label:"Subsidy Off peak Hours – MS (16-06 to 15-10)", type:"fixedZero" },
+
+  2400:{ label:"Summary Energy Charges", type:"sumEC" },
+  2450:{ label:"Summary of Industrial Govt Subsidy on EC", type:"sum1650" },
+
+  2500:{ label:"GST Charges on meter rent", type:"GST_on_rent" },
+  2550:{ label:"CGST Charges on meter rent", type:"CGST_on_rent" },
+  2700:{ label:"Summary GST & CGST", type:"sum2500_2550" },
+
+  2800:{ label:"FCA for Domestic / Non-Residential Supply", type:"fixedZero" },
+  2850:{ label:"FCA for Non-Residential Supply", type:"fixedZero" },
+  2900:{ label:"Summary FCA", type:"sum2800_2850" },
+
+  2960:{ label:"Cow Cess 2 Paisa", type:"cowCess" },
+  3000:{ label:"Summary Cow Cess", type:"sum2960" },
+
+  3050:{ label:"ED for Non-Residential Supply – Rural Area", type:"ED_SOP" },
+  3060:{ label:"ED for Domestic / Medium Supply – Urban Area", type:"ED_SOP" },
+  3070:{ label:"DSSF for Domestic / Non-Residential / Medium Supply", type:"DSSF_SOP" },
+  3080:{ label:"MTAX for Domestic / Medium Supply – Urban Area", type:"MTAX_SOP" },
+  3090:{ label:"IDF for Domestic / Non-Residential / Medium Supply", type:"IDF_SOP" },
+  3200:{ label:"Summary of ED / DSSF / MTAX / IDF", type:"sum3050_3090" },
+
+  3560:{ label:"TOD Surcharge (GEN / NRS)", type:"fixedZero" },
+  3650:{ label:"Summary Surcharge", type:"sum3560" },
+  3700:{ label:"Rebate TOD GEN under MS", type:"fixedZero" },
+  3750:{ label:"Summary Rebate", type:"sum3700" },
+
+  9400:{ label:"SOP Amount", type:"SOP" },
+  9500:{ label:"Total Summary", type:"GrandTotal" }
+};
+
+/* ---------- GLOBAL STATE & DOM REFERENCES ---------- */
+let CSV = { headers:[], data:[] };          // main consumption CSV
+let RCSEQ_CSV = [];                         // RC_SEQ CSV rows for same BILL_ID (optional future)
+let currentRowIndex = -1;
+let manualInputs = {};
+let currentStep = 1;
+let currentResultTab = 'tab-inputs';
+
+const REQUIRED_PARAMS = ["ACBILLMD","BILLDAYS","KWH","LOAD"];
+const inputParams = ["ACCT_ID","BILL_ID","START_DT","END_DT","LOAD","BILLDAYS","ACBILLMD","KVAH","KWH","KVA","KW"];
+
+const fileInput = document.getElementById("fileInput");
+const fileNameEl = document.getElementById("fileName");
+const csvPreview = document.getElementById("csvPreview");
+const inputsTableBody = document.querySelector("#inputsTable tbody");
+const calcTableBody = document.querySelector("#calcTable tbody");
+const actualTableBody = document.querySelector("#actualTable tbody");
+const compareTableBody = document.querySelector("#compareTable tbody");
+const categorySelect = document.getElementById("categorySelect");
+const subcategorySelect = document.getElementById("subcategorySelect");
+const slabSelect = document.getElementById("slabSelect");
+const nextStepBtn = document.getElementById("nextStepBtn");
+const downloadBtn = document.getElementById("downloadBtn");
+const missingParamsContainer = document.getElementById("missingParamsContainer");
+const skipParamsBtn = document.getElementById("skipParamsBtn");
+const fillParamsBtn = document.getElementById("fillParamsBtn");
+const step1Content = document.getElementById("tab-dashboard-content");
+
+const steps = {
+  step1: document.getElementById("step1"),
+  step2: document.getElementById("step2"),
+  step3: document.getElementById("step3")
+};
+
+/* ---------- UTILITIES ---------- */
+function escapeHtml(s){
+  if (s===null||s===undefined) return "";
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"'"}[m]));
+}
+function toNum(v){
+  if (v===null||v===undefined||v==="") return 0;
+  const n = parseFloat(String(v).replace(/[^0-9.\-]+/g,''));
+  return isNaN(n)?0:n;
+}
+function format2(v){ return Number(v).toFixed(2); }
+
+function parseCSVFlexible(text){
+  const lines = text.replace(/\r/g,"").split("\n").filter(l => l.trim().length>0);
+  if (!lines.length) return { headers:[], data:[] };
+  const headerLine = lines[0];
+  const delim = headerLine.indexOf("\t") !== -1 ? "\t" : ",";
+  const rawHeaders = headerLine.split(delim).map(h => h.trim());
+  const data = [];
+  for (let i=1;i<lines.length;i++){
+    const cols = lines[i].split(delim).map(c => c.trim());
+    const obj = {};
+    for (let j=0;j<rawHeaders.length;j++){
+      obj[rawHeaders[j]] = cols[j] !== undefined ? cols[j] : "";
+    }
+    data.push(obj);
+  }
+  return { headers:rawHeaders, data };
+}
+
+const aliases = {
+  "KWH": ["TOTALKWH","TOTAL_KWH","TOTAL KWH","UNITS","TOTALUNITS"],
+  "KW": ["SL_KW","SL-KW","SLKW"],
+  "ACBILLMD": ["AC_BILL_MD","AC BILL MD","ACBILL_M_D"],
+  "BILLDAYS": ["BILL_DAYS","BILL DAYS"]
+};
+function normalizeKey(k){ return String(k||"").replace(/[\s_\-]+/g,"").toLowerCase(); }
+function getRowValue(row, key){
+  if (row.hasOwnProperty(key) && row[key] !== undefined) return row[key];
+  const desired = normalizeKey(key);
+  for (const h of Object.keys(row)){
+    if (normalizeKey(h) === desired) return row[h];
+  }
+  if (aliases[key]){
+    for (const alt of aliases[key]){
+      if (row.hasOwnProperty(alt) && row[alt] !== undefined) return row[alt];
+      for (const h of Object.keys(row)){
+        if (normalizeKey(h) === normalizeKey(alt)) return row[h];
+      }
+    }
+  }
+  return undefined;
+}
+
+/* ---------- WIZARD NAV ---------- */
+function showStep(stepNum){
+  Object.values(steps).forEach((step, index) => {
+    step.classList.toggle("active", index+1===stepNum);
+  });
+  document.querySelectorAll(".wizard-progress .step").forEach((stepEl, idx) => {
+    stepEl.classList.toggle("completed", idx < stepNum-1);
+    stepEl.classList.toggle("active", idx === stepNum-1);
+  });
+  if (stepNum === 3){
+    document.getElementById("resultTabControls").classList.remove("tab-nav-disabled");
+    downloadBtn.style.display = "inline-flex";
+  } else {
+    document.getElementById("resultTabControls").classList.add("tab-nav-disabled");
+    downloadBtn.style.display = "none";
+  }
+  currentStep = stepNum;
+}
+
+function handleTabSwitch(targetId){
+  document.querySelectorAll(".nav-btn").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.target === targetId);
+  });
+  const isDashboardTab = targetId === "tab-dashboard";
+  if (isDashboardTab){
+    showStep(1);
+    step1Content.style.display = "block";
+  } else if (currentStep === 3){
+    showStep(3);
+    currentResultTab = targetId;
+    step1Content.style.display = "none";
+    document.querySelectorAll("#resultTabControls .tab-btn").forEach(btn=>{
+      btn.classList.toggle("active", btn.dataset.target === targetId);
+    });
+    document.querySelectorAll("#step3 .tab-content").forEach(tab=>{
+      tab.classList.toggle("hidden", tab.id !== targetId);
+    });
+  } else {
+    alert("Please upload CSV, select a record, and click 'Next Step' to generate results before viewing details.");
+    document.querySelector(".nav-btn.active")?.classList.remove("active");
+    document.querySelector('.nav-btn[data-target="tab-dashboard"]').classList.add("active");
+    showStep(1);
+    step1Content.style.display = "block";
+  }
+}
+
+document.querySelectorAll(".nav-btn").forEach(button=>{
+  button.addEventListener("click",e=>handleTabSwitch(e.currentTarget.dataset.target));
+});
+document.getElementById("resultTabControls").addEventListener("click",e=>{
+  if (e.target.classList.contains("tab-btn")) handleTabSwitch(e.target.dataset.target);
+});
+document.querySelector("#step1 .tab-controls").addEventListener("click",e=>{
+  if (e.target.classList.contains("tab-btn")) handleTabSwitch(e.target.dataset.target);
+});
+
+/* ---------- CATEGORY → SUBCATEGORY → SLAB ---------- */
+const categoryMap = {
+  "DS": ["BE","BPL","Durgiana Temple","Freedom Fighter","General","Golden Temple","Non Subsidy"],
+  "WDS": ["General"],
+  "NRS": ["General"],
+  "IND": ["LS","SP","MS","BS"],
+  "Agriculture": ["General"],
+  "Public Light": ["General"],
+  "Railway Traction": ["General"]
+};
+
+function populateSubcategories(cat){
+  subcategorySelect.innerHTML = '<option value="">Select</option>';
+  (categoryMap[cat] || []).forEach(sc=>{
+    const opt = document.createElement("option");
+    opt.value = sc;
+    opt.textContent = sc;
+    subcategorySelect.appendChild(opt);
+  });
+  populateSlabs();   // reset slabs
+  updateNextButton();
+}
+
+function populateSlabs(){
+  slabSelect.innerHTML = '<option value="">Select</option>';
+  const cat = categorySelect.value;
+  const tariffCat = TARIFFS[cat];
+  if (!tariffCat) return;
+  Object.keys(tariffCat).forEach(slabName=>{
+    const opt = document.createElement("option");
+    opt.value = slabName;
+    opt.textContent = slabName;
+    slabSelect.appendChild(opt);
+  });
+}
+
+categorySelect.addEventListener("change",()=>populateSubcategories(categorySelect.value));
+subcategorySelect.addEventListener("change",updateNextButton);
+slabSelect.addEventListener("change",updateNextButton);
+
+function updateNextButton(){
+  const hasCSV = CSV.data.length > 0;
+  const hasCategory = !!categorySelect.value;
+  const hasSubcategory = !!subcategorySelect.value;
+  const hasSlab = !!slabSelect.value;
+  const hasRecord = currentRowIndex >= 0;
+  nextStepBtn.style.display =
+    hasCSV && hasCategory && hasSubcategory && hasSlab && hasRecord
+      ? "inline-flex"
+      : "none";
+}
+
+
+/* ---------- FILE UPLOAD + PREVIEW + RECORD PICK ---------- */
+fileInput.addEventListener("change", async ev=>{
+  const file = ev.target.files[0];
+  if (!file){
+    fileNameEl.textContent = "No file selected";
+    CSV = { headers:[], data:[] };
+    document.querySelector(".sidebar .meta-small").innerText = "No data loaded";
+    currentRowIndex = -1;
+    updateNextButton();
+    return;
+  }
+  fileNameEl.textContent = file.name;
+  const text = await file.text();
+  CSV = parseCSVFlexible(text);
+  renderPreview(CSV.headers, CSV.data);
+  currentRowIndex = CSV.data.length ? 0 : -1;
+  if (currentRowIndex >= 0) updateRecordSnapshot();
+  document.querySelector(".sidebar .meta-small").innerText =
+    `Loaded ${CSV.data.length} record(s)`;
+  updateNextButton();
+});
+
+
+
+function renderPreview(headers, rows){
+  let html = "<thead><tr>";
+  headers.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
+  html += "</tr></thead><tbody>";
+
+  // loop over all rows instead of first 10
+  rows.forEach(r => {
+    html += "<tr>";
+    headers.forEach(h => {
+      html += `<td>${escapeHtml(r[h] || "")}</td>`;
+    });
+    html += "</tr>";
+  });
+
+  html += "</tbody>";
+  csvPreview.innerHTML = html;
+}
+
+function extractInputsFromTallCSV(billId){
+  const rows = CSV.data.filter(r => String(r.BILL_ID) === String(billId));
+  let ACBILLMD = 0, BILLDAYS = 0, KWH = 0, KW = 0;
+
+  rows.forEach(r => {
+    const sqi = (r.SQI_CD || "").toUpperCase();
+    const uom = (r.UOM_CD || "").toUpperCase();
+    const v   = toNum(r.BILL_SQ);
+
+    if (sqi === "ACBILLMD") ACBILLMD = v;
+    else if (sqi === "BILLDAYS") BILLDAYS = v;
+    else if (sqi === "SL-KW") KW = v;
+    else if (sqi === "TOTALKWH" || (sqi === "KWH" && uom === "KWH")) {
+      // prefer TOTALKWH, but if only KWH exists, use it
+      if (sqi === "TOTALKWH") KWH = v;
+      else if (!KWH) KWH = v;
+    }
+  });
+
+  return { ACBILLMD, BILLDAYS, KWH, KW };
+}
+
+function updateRecordSnapshot(){
+  if (!CSV.data.length) return;
+
+  // use the BILL_ID of the first row
+  const first = CSV.data[0];
+  const billId = first.BILL_ID;
+  currentRowIndex = 0;
+
+  const inputs = extractInputsFromTallCSV(billId);
+  document.getElementById("sumACB").innerText  = format2(inputs.ACBILLMD);
+  document.getElementById("sumDays").innerText = inputs.BILLDAYS;
+  document.getElementById("sumKWH").innerText  = format2(inputs.KWH);
+  document.getElementById("sumKW").innerText   = format2(inputs.KW);
+
+  document.getElementById("sumTotalSummary").innerText = "—";
+  document.getElementById("sumSOP").innerText = "—";
+}
+
+/* ---------- STEP 2: MISSING PARAMETERS ---------- */
+function showMissingParams(){
+  if (!CSV.data.length) return;
+
+  const first = CSV.data[0];
+  const billId = first.BILL_ID;
+  const baseInputs = extractInputsFromTallCSV(billId);
+
+  const missingParams = [];
+
+  REQUIRED_PARAMS.forEach(param => {
+    let val = 0;
+    if (param === "ACBILLMD")      val = baseInputs.ACBILLMD;
+    else if (param === "BILLDAYS") val = baseInputs.BILLDAYS;
+    else if (param === "KWH")      val = baseInputs.KWH;
+    else if (param === "LOAD")     val = baseInputs.KW;
+
+    if (!val || val === 0) missingParams.push(param);
+  });
+
+  manualInputs = {};
+  missingParamsContainer.innerHTML = "";
+
+  if (!missingParams.length){
+    missingParamsContainer.innerHTML =
+      '<div class="small muted" style="padding:20px;text-align:center">All required parameters found in CSV</div>';
+    skipParamsBtn.style.display = "none";
+    fillParamsBtn.textContent = "Continue to Results";
+    fillParamsBtn.style.display = "inline-flex";
+  } else {
+    missingParams.forEach(param => {
+      const div = document.createElement("div");
+      div.className = "param-input-group";
+      div.innerHTML =
+        `<label class="small"><strong>${param}</strong> (missing from CSV or zero)</label>
+         <input type="number" id="manual_${param}" placeholder="Enter ${param} value (optional)" step="0.01">`;
+      missingParamsContainer.appendChild(div);
+    });
+    skipParamsBtn.style.display = "inline-flex";
+    fillParamsBtn.textContent = "Fill & Continue";
+    fillParamsBtn.style.display = "inline-flex";
+  }
+
+  showStep(2);
+}
+
+const processResults = () => {
+  manualInputs = {};
+  document.querySelectorAll("#missingParamsContainer input").forEach(input=>{
+    const param = input.id.replace("manual_","");
+    if (input.value !== "") manualInputs[param] = toNum(input.value);
+  });
+  generateResults();
+  showStep(3);
+  handleTabSwitch("tab-inputs");
+};
+
+nextStepBtn.addEventListener("click",showMissingParams);
+fillParamsBtn.addEventListener("click",processResults);
+skipParamsBtn.addEventListener("click",processResults);
+
+/* ---------- CONFIG (OPTIONAL) ---------- */
+const cfgDefaults = { r1:4.44, r2:6.64, r3:7.75, fr:75 };
+function loadConfig(){
+  const saved = localStorage.getItem("eb_config_v1");
+  if (saved){
+    try { return Object.assign({}, cfgDefaults, JSON.parse(saved)); } catch(e){}
+  }
+  return cfgDefaults;
+}
+function applyConfigToForm(){
+  const c = loadConfig();
+  document.getElementById("cfg_r1").value = c.r1;
+  document.getElementById("cfg_r2").value = c.r2;
+  document.getElementById("cfg_r3").value = c.r3;
+  document.getElementById("cfg_fr").value = c.fr;
+}
+document.getElementById("saveConfig").addEventListener("click",()=>{
+  const obj = {
+    r1: toNum(document.getElementById("cfg_r1").value),
+    r2: toNum(document.getElementById("cfg_r2").value),
+    r3: toNum(document.getElementById("cfg_r3").value),
+    fr: toNum(document.getElementById("cfg_fr").value)
+  };
+  localStorage.setItem("eb_config_v1",JSON.stringify(obj));
+  alert("Config saved locally");
+});
+document.getElementById("resetConfig").addEventListener("click",()=>{
+  localStorage.removeItem("eb_config_v1");
+  applyConfigToForm();
+  alert("Config reset to defaults");
+});
+
+/* ---------- CORE CALCULATION USING RC_SEQ ---------- */
+function generateResults(){
+  if (currentRowIndex < 0 || !CSV.data[currentRowIndex]) return;
+  const row = CSV.data[currentRowIndex];
+
+  // merge manual inputs
+  const finalData = {...row};
+  Object.keys(manualInputs).forEach(k=>{ finalData[k] = manualInputs[k]; });
+
+  // 1. Input Parameters table
+  inputsTableBody.innerHTML = "";
+  inputParams.forEach(k=>{
+    const rawManual = manualInputs[k];
+    const rawCsv = getRowValue(row,k);
+    let value, source;
+    if (rawManual !== undefined && rawManual !== null && rawManual !== ""){
+      value = toNum(rawManual); source = "Manual";
+    } else if (rawCsv !== undefined && rawCsv !== null && rawCsv !== ""){
+      value = toNum(rawCsv); source = "CSV";
+    } else {
+      value = 0; source = "Default (0)";
+    }
+    finalData[k] = value;
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${escapeHtml(k)}</td>
+       <td>${escapeHtml(source)}</td>
+       <td>${escapeHtml(format2(value))}</td>`;
+    inputsTableBody.appendChild(tr);
+  });
+
+const billId = CSV.data[0]?.BILL_ID;
+const baseInputs = extractInputsFromTallCSV(billId);
+
+const BILLDAYS = manualInputs.BILLDAYS ?? baseInputs.BILLDAYS;
+const ACBILLMD = manualInputs.ACBILLMD ?? baseInputs.ACBILLMD;
+const UNITS    = manualInputs.KWH      ?? baseInputs.KWH;
+const LOAD     = manualInputs.LOAD     ?? baseInputs.KW; // LOAD from KW
+
+
+  // slabs 0‑100 / 101‑300 / >300
+  const slab1 = Math.min(UNITS,100);
+  const slab2 = Math.min(Math.max(UNITS-100,0),200);
+  const slab3 = Math.max(UNITS-300,0);
+
+  // chosen tariff
+  const cat = categorySelect.value;
+  const slabName = slabSelect.value;
+  const tariff = (TARIFFS[cat] || {})[slabName] || { fixedPerKW:75, energyRate:4.44 };
+  const fixedRate = tariff.fixedPerKW;
+  const ds_r1 = 4.44, ds_r2 = 6.64, ds_r3 = 7.75;
+
+  // container for all RC_SEQ calculated values
+  const rc = {};
+
+  // helpers
+  const rentFromPerDay = perDay => (BILLDAYS * perDay) / 30;
+
+  // fixed charges / subsidies
+  rc[100] = (ACBILLMD * 140 * BILLDAYS * 12) / 365;
+  rc[110] = (ACBILLMD * 75  * BILLDAYS * 12) / 365;
+  rc[180] = (ACBILLMD * 140 * BILLDAYS * 12) / 365;
+  rc[300] = -rc[100] * 0.5;
+  rc[550] = -755.31;
+  rc[560] = 0;
+  rc[590] = rc[300] + rc[550] + rc[560];
+  rc[600] = (ACBILLMD * fixedRate * BILLDAYS * 12) / 365;
+
+  // rents
+  rc[650] = rentFromPerDay(11);
+  rc[690] = rentFromPerDay(19);
+  rc[700] = rentFromPerDay(5);
+  rc[710] = rentFromPerDay(567);
+  rc[750] = rentFromPerDay(65);
+  rc[900] = rentFromPerDay(9);
+  rc[950] = rentFromPerDay(13);
+  const totalRent = rc[650]+rc[690]+rc[700]+rc[710]+rc[750]+rc[900]+rc[950];
+  rc[1000]= totalRent;
+
+  // energy charges
+  rc[1100]= UNITS * 6.10;
+  rc[1160]= (slab1 * ds_r1) + (slab2 * ds_r2);
+  rc[1170]= slab3 * ds_r3;
+  rc[1250]= UNITS * 6.75;
+
+  // subsidies
+  rc[1650]= -322.77;
+  rc[1860]= -9250;
+
+  // summaries
+  rc[2400]= rc[1160] + rc[1170] + rc[1100] + rc[1250];
+  rc[2450]= rc[1650];
+
+  // SOP
+  const sub0_100   = rc[300];         // from 50% fixed MS
+  const sub100_300 = rc[550] + rc[560];
+  const subAbove   = rc[1860];
+  rc[9400] = rc[2400] + rc[600] - (sub0_100 + sub100_300 + subAbove);
+  const SOP = rc[9400];
+
+  // taxes on rent
+  rc[2500] = totalRent * 0.09;
+  rc[2550] = totalRent * 0.09;
+  rc[2700] = rc[2500] + rc[2550];
+
+  // cow cess
+  rc[2960] = UNITS * 0.02;
+  rc[3000] = rc[2960];
+
+  // SOP‑based taxes
+  rc[3050] = SOP * 0.08;
+  rc[3060] = SOP * 0.08;
+  rc[3070] = SOP * 0.05;
+  rc[3080] = SOP * 0.02;
+  rc[3090] = SOP * 0.05;
+  rc[3200] = rc[3050]+rc[3060]+rc[3070]+rc[3080]+rc[3090];
+
+  // surcharge / rebate
+  rc[3560] = 0;
+  rc[3650] = rc[3560];
+  rc[3700] = 0;
+  rc[3750] = rc[3700];
+
+  // grand total
+  rc[9500] = rc[9400] + rc[2700] + rc[3200] + rc[3000] + rc[3650] - rc[3750];
+
+  /* ---- fill Computation Details table ---- */
+  calcTableBody.innerHTML = "";
+  Object.keys(RC_SEQ_META).sort((a,b)=>a-b).forEach(k=>{
+    const code = Number(k);
+    const meta = RC_SEQ_META[code];
+    const val  = rc[code] ?? 0;
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${code} – ${escapeHtml(meta.label)}</td>
+       <td>₹${escapeHtml(format2(val))}</td>
+       <td class="formula">${escapeHtml(meta.type)}</td>`;
+    calcTableBody.appendChild(tr);
+  });
+
+  /* ---- Actual RC_SEQ table (from RC_SEQ CSV style) ---- */
+  // For now, assume the same CSV is RC_SEQ‑style; adapt later if needed
+ /* ---- Actual RC_SEQ table (from RC_SEQ CSV style) ---- */
+actualTableBody.innerHTML = "";
+CSV.data.forEach(r => {
+  const rcSeq = r["RC_SEQ"] || r["RCSEQ"];
+  if (!rcSeq) return;
+  const desc  = r["DESCR_ON_BILL"] || r["DESCR_ON"] || "";
+  const val   = r["BILL_SQ"] !== undefined ? r["BILL_SQ"] : "0";
+  const tr = document.createElement("tr");
+  tr.innerHTML =
+    `<td>${escapeHtml(rcSeq)}</td>
+     <td>${escapeHtml(desc)}</td>
+     <td>${escapeHtml(val)}</td>`;
+  actualTableBody.appendChild(tr);
+});
+
+  /* ---- Comparison (Calculated vs CSV by RC_SEQ) ---- */
+  compareTableBody.innerHTML = "";
+ const byRcSeq = {};
+CSV.data.forEach(r => {
+  const rcSeq = Number(r["RC_SEQ"] || r["RCSEQ"]);
+  if (!rcSeq) return;
+  byRcSeq[rcSeq] = byRcSeq[rcSeq] || 0;
+  byRcSeq[rcSeq] += toNum(r["BILL_SQ"]);
+});
+
+
+  Object.keys(RC_SEQ_META).sort((a,b)=>a-b).forEach(k=>{
+    const code = Number(k);
+    const meta = RC_SEQ_META[code];
+    const calcVal = rc[code] ?? 0;
+    const actualVal = byRcSeq[code] ?? 0;
+    const relevantForCat = true; // you can later narrow by category if needed
+
+    let status = "";
+    if (!relevantForCat){
+      return; // hide completely
+    } else if (actualVal === 0 && Math.abs(calcVal) < 0.01){
+      status = "Pass";
+    } else if (actualVal === 0 && Math.abs(calcVal) >= 0.01){
+      status = "0 in CSV (pending)";
+    } else {
+      const diff = Math.abs(calcVal - actualVal);
+      status = diff <= 0.5 ? "Pass" : "Fail";
+    }
+
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${code}</td>
+       <td>${escapeHtml(meta.label)}</td>
+       <td>₹${escapeHtml(format2(actualVal))}</td>
+       <td>₹${escapeHtml(format2(calcVal))}</td>
+       <td class="${status==="Pass" ? "status-pass" : (status.includes("pending") ? "" : "status-fail")}">${escapeHtml(status)}</td>`;
+    compareTableBody.appendChild(tr);
+  });
+
+  downloadBtn.style.display = "inline-flex";
+}
+
+/* ---------- EXPORT CSV OF COMPARISON ---------- */
+function downloadReportCSV(){
+  const rows = [["RC_SEQ","Component","Actual","Calculated","Status"]];
+  document.querySelectorAll("#compareTable tbody tr").forEach(tr=>{
+    const cells = Array.from(tr.children).map(c=>c.innerText);
+    rows.push(cells);
+  });
+  const csv = rows.map(r => r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv],{type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `billing_comparison_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- INIT ---------- */
+populateSubcategories("");
+applyConfigToForm();
+showStep(1);
+</script>
+</body>
+</html>
